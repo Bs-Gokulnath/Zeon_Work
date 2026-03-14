@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand: #0073EA;
+  --brand-hover: #0060C0;
+  --brand-light: #DCE9FC;
+  --sidebar-bg: #F5F6F8;
+  --sidebar-active: #DCE9FC;
+  --sidebar-hover: #ECEDF5;
+  --sidebar-border: #D0D4E4;
+  --text: #323338;
+  --text-muted: #676879;
+  --border: #D0D4E4;
+  --bg: #F5F6F8;
+  --white: #FFFFFF;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  color: var(--text);
+  background: var(--white);
+  font-family: var(--font-roboto), Roboto, ui-sans-serif, system-ui, sans-serif;
+}

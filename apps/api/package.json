@@ -1,0 +1,42 @@
+{
+  "name": "@monday1/api",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "nest start --watch",
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "db:generate": "cd ../../packages/database && npm run db:generate",
+    "db:migrate": "cd ../../packages/database && npm run db:migrate",
+    "db:seed": "cd ../../packages/database && npm run db:seed",
+    "db:studio": "cd ../../packages/database && npm run db:studio"
+  },
+  "dependencies": {
+    "@monday1/database": "*",
+    "@monday1/types": "*",
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/core": "^10.0.0",
+    "@nestjs/jwt": "^10.0.0",
+    "@nestjs/passport": "^10.0.0",
+    "@nestjs/platform-express": "^10.0.0",
+    "@nestjs/config": "^3.0.0",
+    "@nestjs/swagger": "^7.0.0",
+    "@prisma/client": "^5.0.0",
+    "nodemailer": "^6.9.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.0",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "reflect-metadata": "^0.1.13",
+    "rxjs": "^7.8.0"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^10.0.0",
+    "@nestjs/testing": "^10.0.0",
+    "@types/nodemailer": "^6.4.0",
+    "@types/passport-jwt": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
