@@ -65,12 +65,15 @@ function AddNewMenu({ anchorRect, onClose, onSelect }: {
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose]);
 
+  const menuTop = Math.max(8, Math.min(anchorRect.top, window.innerHeight - 60));
+
   return createPortal(
-    <div ref={ref} style={{ position: 'fixed', top: anchorRect.top, left: anchorRect.right + 6, zIndex: 9999 }}>
+    <div ref={ref} style={{ position: 'fixed', top: menuTop, left: anchorRect.right + 6, zIndex: 9999 }}>
       <div style={{
         backgroundColor: '#fff', border: '1px solid #D0D4E4', borderRadius: 10,
         boxShadow: '0 8px 24px rgba(0,0,0,0.14)', padding: '8px 0', width: 270,
         fontFamily: 'Roboto, sans-serif',
+        maxHeight: `calc(100vh - ${menuTop}px - 16px)`, overflowY: 'auto',
       }}>
         <p style={{ fontSize: 13, fontWeight: 600, color: '#676879', padding: '6px 18px 8px', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
           Add new
