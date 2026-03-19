@@ -45,6 +45,55 @@ function parseExcel(filePath) {
   return groups;
 }
 
+// ── Parse updates sheet (second sheet) ────────────────────────────────────────
+// Returns array of { itemName, author, content, createdAt }
+function parseUpdates(filePath) {
+  const wb = xlsx.readFile(filePath);
+  if (wb.SheetNames.length < 2) return [];
+
+  const ws  = wb.Sheets[wb.SheetNames[1]];
+  const raw = xlsx.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+  // Find header row (contains 'Item Name')
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(5, raw.length); i++) {
+    if (raw[i].includes('Item Name')) { headerIdx = i; break; }
+  }
+  if (headerIdx === -1) return [];
+
+  const headers = raw[headerIdx];
+  const idxItemName    = headers.indexOf('Item Name');
+  const idxUser        = headers.indexOf('User');
+  const idxCreatedAt   = headers.indexOf('Created At');
+  const idxContent     = headers.indexOf('Update Content');
+  const idxContentType = headers.indexOf('Content Type');
+
+  const updates = [];
+  for (let i = headerIdx + 1; i < raw.length; i++) {
+    const row = raw[i];
+    if (!row[idxItemName] || !row[idxContent]) continue;
+    // Skip replies (Parent Post ID present) — only top-level updates
+    const contentType = String(row[idxContentType] || '').trim();
+    if (contentType.toLowerCase() === 'reply') continue;
+
+    const dateStr = String(row[idxCreatedAt] || '').trim();
+    let createdAt;
+    try {
+      // Format: "08/September/2025  06:24:25 AM"
+      createdAt = new Date(dateStr.replace(/\//g, ' ')) || new Date();
+      if (isNaN(createdAt.getTime())) createdAt = new Date();
+    } catch { createdAt = new Date(); }
+
+    updates.push({
+      itemName:  String(row[idxItemName]).trim(),
+      author:    String(row[idxUser] || 'User').trim(),
+      content:   String(row[idxContent]).trim(),
+      createdAt,
+    });
+  }
+  return updates;
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function cleanStr(v) {
   if (v == null) return '';
@@ -147,7 +196,8 @@ async function importFile(filePath, userId) {
   const deleted = await prisma.boardGroup.deleteMany({ where: { boardId: board.id } });
   if (deleted.count > 0) console.log(`🗑   Cleared ${deleted.count} existing group(s)`);
 
-  // Insert groups + items
+  // Insert groups + items, build name→id map for updates
+  const itemNameToId = {};
   let groupIdx = 0;
   for (const gName of groupNames) {
     const rows = groups[gName];
@@ -160,7 +210,8 @@ async function importFile(filePath, userId) {
       .map((r, i) => mapItem(r, grp.id, i, boardName));
 
     for (const item of itemData) {
-      await prisma.boardItem.create({ data: item });
+      const created = await prisma.boardItem.create({ data: item });
+      itemNameToId[item.name.toLowerCase()] = created.id;
     }
     console.log(`   📁 "${gName}" → ${itemData.length} items`);
     groupIdx++;
@@ -172,6 +223,21 @@ async function importFile(filePath, userId) {
       data: { name: 'Completed', color: '#00C875', position: groupIdx, boardId: board.id },
     });
     console.log(`   📁 "Completed" → 0 items (empty group added)`);
+  }
+
+  // Import updates from second sheet
+  const updates = parseUpdates(filePath);
+  let updatesImported = 0;
+  for (const u of updates) {
+    const itemId = itemNameToId[u.itemName.toLowerCase()];
+    if (!itemId) continue;
+    await prisma.itemUpdate.create({
+      data: { content: u.content, author: u.author, itemId, createdAt: u.createdAt },
+    });
+    updatesImported++;
+  }
+  if (updates.length > 0) {
+    console.log(`   💬 Updates: ${updatesImported} imported (${updates.length - updatesImported} unmatched)`);
   }
 
   console.log(`✔   Done: "${boardName}"`);

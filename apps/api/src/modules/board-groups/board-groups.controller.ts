@@ -4,6 +4,7 @@ import { BoardGroupsService } from './board-groups.service';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { CreateItemDto } from './dto/create-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
+import { CreateUpdateDto } from './dto/create-update.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -42,5 +43,21 @@ export class BoardGroupsController {
   @Delete(':groupId/items/:itemId')
   deleteItem(@Param('boardId') boardId: string, @Param('groupId') groupId: string, @Param('itemId') itemId: string, @CurrentUser() user: { id: string }) {
     return this.service.deleteItem(boardId, groupId, itemId, user.id);
+  }
+
+  // ── Item Updates (comments) ─────────────────────────────────────────────────
+  @Get(':groupId/items/:itemId/updates')
+  getUpdates(@Param('boardId') boardId: string, @Param('itemId') itemId: string, @CurrentUser() user: { id: string }) {
+    return this.service.getUpdates(boardId, itemId, user.id);
+  }
+
+  @Post(':groupId/items/:itemId/updates')
+  createUpdate(@Param('boardId') boardId: string, @Param('itemId') itemId: string, @CurrentUser() user: { id: string }, @Body() dto: CreateUpdateDto) {
+    return this.service.createUpdate(boardId, itemId, user.id, dto);
+  }
+
+  @Delete(':groupId/items/:itemId/updates/:updateId')
+  deleteUpdate(@Param('boardId') boardId: string, @Param('itemId') itemId: string, @Param('updateId') updateId: string, @CurrentUser() user: { id: string }) {
+    return this.service.deleteUpdate(boardId, itemId, updateId, user.id);
   }
 }

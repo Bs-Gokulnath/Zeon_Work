@@ -48,7 +48,7 @@ model BoardGroup {
 }
 
 model BoardItem {
-  id               String     @id @default(uuid())
+  id               String       @id @default(uuid())
   name             String
   status           String?
   priority         String?
@@ -68,13 +68,26 @@ model BoardItem {
   notes            String?
   reminderDate     String?
   dueDate          String?
-  position         Int        @default(0)
+  position         Int          @default(0)
   groupId          String
-  group            BoardGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  group            BoardGroup   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  updates          ItemUpdate[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   @@map("board_items")
+}
+
+model ItemUpdate {
+  id        String    @id @default(uuid())
+  content   String
+  author    String
+  itemId    String
+  item      BoardItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("item_updates")
 }
 
 model OtpCode {

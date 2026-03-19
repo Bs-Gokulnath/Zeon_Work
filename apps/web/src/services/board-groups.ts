@@ -1,5 +1,14 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
+export interface ItemUpdate {
+  id: string;
+  content: string;
+  author: string;
+  itemId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BoardItem {
   id: string;
   name: string;
@@ -25,6 +34,7 @@ export interface BoardItem {
   groupId: string;
   createdAt: string;
   updatedAt?: string;
+  _count?: { updates: number };
 }
 
 export interface BoardGroup {
@@ -75,4 +85,15 @@ export const groupsApi = {
 
   deleteItem: (boardId: string, groupId: string, itemId: string) =>
     request<{ message: string }>(`/boards/${boardId}/groups/${groupId}/items/${itemId}`, { method: 'DELETE' }),
+
+  getUpdates: (boardId: string, groupId: string, itemId: string) =>
+    request<{ data: ItemUpdate[] }>(`/boards/${boardId}/groups/${groupId}/items/${itemId}/updates`),
+
+  createUpdate: (boardId: string, groupId: string, itemId: string, content: string) =>
+    request<{ data: ItemUpdate }>(`/boards/${boardId}/groups/${groupId}/items/${itemId}/updates`, {
+      method: 'POST', body: JSON.stringify({ content }),
+    }),
+
+  deleteUpdate: (boardId: string, groupId: string, itemId: string, updateId: string) =>
+    request<{ message: string }>(`/boards/${boardId}/groups/${groupId}/items/${itemId}/updates/${updateId}`, { method: 'DELETE' }),
 };

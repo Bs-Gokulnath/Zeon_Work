@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { CreateItemDto } from './dto/create-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
+import { CreateUpdateDto } from './dto/create-update.dto';
 
 @Injectable()
 export class BoardGroupsService {
@@ -20,7 +21,10 @@ export class BoardGroupsService {
       where: { boardId },
       orderBy: { position: 'asc' },
       include: {
-        items: { orderBy: { position: 'asc' } },
+        items: {
+          orderBy: { position: 'asc' },
+          include: { _count: { select: { updates: true } } },
+        },
       },
     });
     return { data: groups };
@@ -72,5 +76,32 @@ export class BoardGroupsService {
     if (!item) throw new NotFoundException('Item not found');
     await this.prisma.boardItem.delete({ where: { id: itemId } });
     return { message: 'Item deleted' };
+  }
+
+  // ── Item Updates ─────────────────────────────────────────────────────────────
+  async getUpdates(boardId: string, itemId: string, userId: string) {
+    await this.verifyBoardOwner(boardId, userId);
+    const updates = await this.prisma.itemUpdate.findMany({
+      where: { itemId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return { data: updates };
+  }
+
+  async createUpdate(boardId: string, itemId: string, userId: string, dto: CreateUpdateDto) {
+    await this.verifyBoardOwner(boardId, userId);
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const update = await this.prisma.itemUpdate.create({
+      data: { content: dto.content, author: user?.name ?? 'User', itemId },
+    });
+    return { data: update };
+  }
+
+  async deleteUpdate(boardId: string, itemId: string, updateId: string, userId: string) {
+    await this.verifyBoardOwner(boardId, userId);
+    const update = await this.prisma.itemUpdate.findFirst({ where: { id: updateId, itemId } });
+    if (!update) throw new NotFoundException('Update not found');
+    await this.prisma.itemUpdate.delete({ where: { id: updateId } });
+    return { message: 'Update deleted' };
   }
 }
