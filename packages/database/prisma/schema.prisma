@@ -20,15 +20,61 @@ model User {
 }
 
 model Board {
-  id          String   @id @default(uuid())
+  id          String       @id @default(uuid())
   name        String
   description String?
+  type        BoardType    @default(NORMAL)
   userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groups      BoardGroup[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   @@map("boards")
+}
+
+model BoardGroup {
+  id        String      @id @default(uuid())
+  name      String
+  color     String      @default("#0085FF")
+  position  Int         @default(0)
+  boardId   String
+  board     Board       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  items     BoardItem[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@map("board_groups")
+}
+
+model BoardItem {
+  id               String     @id @default(uuid())
+  name             String
+  status           String?
+  priority         String?
+  owner            String?
+  state            String?
+  city             String?
+  location         String?
+  propertyType     String?
+  googleRating     Float?
+  noOfRatings      Int?
+  landOwnerContact String?
+  phone            String?
+  email            String?
+  powerAvailability String?
+  investment       String?
+  availableParking String?
+  notes            String?
+  reminderDate     String?
+  dueDate          String?
+  position         Int        @default(0)
+  groupId          String
+  group            BoardGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@map("board_items")
 }
 
 model OtpCode {
@@ -45,4 +91,9 @@ model OtpCode {
 enum Role {
   USER
   ADMIN
+}
+
+enum BoardType {
+  NORMAL
+  MULTI_LEVEL
 }

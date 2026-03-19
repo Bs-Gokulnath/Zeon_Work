@@ -21,8 +21,14 @@
   box-sizing: border-box;
 }
 
+/* Hide horizontal scrollbar on the board content area (sticky bar handles it) */
+.board-content::-webkit-scrollbar-horizontal { display: none; }
+.board-content { scrollbar-width: none; }
+.board-content::-webkit-scrollbar { height: 0; }
+
 body {
   color: var(--text);
   background: var(--white);
   font-family: var(--font-roboto), Roboto, ui-sans-serif, system-ui, sans-serif;
+  font-size: 17px;
 }

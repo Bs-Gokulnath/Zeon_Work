@@ -17,6 +17,11 @@ export class BoardsController {
     return this.boardsService.findAll(user.id);
   }
 
+  @Get(':id')
+  findOne(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    return this.boardsService.findOne(id, user.id);
+  }
+
   @Post()
   create(@CurrentUser() user: { id: string }, @Body() dto: CreateBoardDto) {
     return this.boardsService.create(user.id, dto);

@@ -1,4 +1,9 @@
-import { IsString, MinLength, MaxLength, IsOptional } from 'class-validator';
+import { IsString, MinLength, MaxLength, IsOptional, IsEnum } from 'class-validator';
+
+export enum BoardType {
+  NORMAL = 'NORMAL',
+  MULTI_LEVEL = 'MULTI_LEVEL',
+}
 
 export class CreateBoardDto {
   @IsString()
@@ -10,4 +15,8 @@ export class CreateBoardDto {
   @IsString()
   @MaxLength(500)
   description?: string;
+
+  @IsOptional()
+  @IsEnum(BoardType)
+  type?: BoardType;
 }

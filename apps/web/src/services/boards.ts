@@ -1,9 +1,12 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
+export type BoardType = 'NORMAL' | 'MULTI_LEVEL';
+
 export interface Board {
   id: string;
   name: string;
   description?: string;
+  type: BoardType;
   createdAt: string;
 }
 
@@ -23,7 +26,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export const boardsApi = {
   getAll: () => request<{ data: Board[] }>('/boards'),
-  create: (name: string, description?: string) =>
-    request<{ data: Board }>('/boards', { method: 'POST', body: JSON.stringify({ name, description }) }),
+  getOne: (id: string) => request<{ data: Board }>(`/boards/${id}`),
+  create: (name: string, type: BoardType = 'NORMAL', description?: string) =>
+    request<{ data: Board }>('/boards', { method: 'POST', body: JSON.stringify({ name, type, description }) }),
   remove: (id: string) => request<{ message: string }>(`/boards/${id}`, { method: 'DELETE' }),
 };
