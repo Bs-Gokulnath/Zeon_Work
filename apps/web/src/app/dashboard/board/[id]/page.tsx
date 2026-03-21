@@ -7,12 +7,17 @@ import {
   Table2, Loader2, Layers, MoreHorizontal, Trash2, Check,
   MapPin, Eye, Users, Star, FileText, X, Type, Hash,
   Calendar, ToggleLeft, Phone, Mail, AlertCircle, MessageCircle,
-  AtSign, Paperclip, Smile, Sparkles, ThumbsUp, Reply, Video, Share2,
+  AtSign, Paperclip, Smile, Sparkles, ThumbsUp, Reply, Video, Share2, AlignLeft,
+  Settings, Copy, Pencil, Lock, ArrowLeftRight, ChevronsUpDown, LayoutGrid, Info, AlignJustify,
 } from 'lucide-react';
 import type { Board } from '@/services/boards';
 import { boardsApi } from '@/services/boards';
 import type { BoardGroup, BoardItem, ItemUpdate } from '@/services/board-groups';
 import { groupsApi } from '@/services/board-groups';
+import { usersApi } from '@/services/users';
+import type { User } from '@/services/users';
+import dynamic from 'next/dynamic';
+const MapView = dynamic(() => import('@/components/ui/MapView'), { ssr: false });
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function avatarColor(name: string) {
@@ -110,14 +115,85 @@ const BASE_COLS: ColDef[] = [
   { key: '_creationLog',     label: 'Creation log',       width: 175 },
 ];
 
-const CUSTOM_COL_TYPES = [
-  { type: 'text',   label: 'Text',   icon: Type },
-  { type: 'number', label: 'Number', icon: Hash },
-  { type: 'date',   label: 'Date',   icon: Calendar },
-  { type: 'status', label: 'Status', icon: ToggleLeft },
-  { type: 'phone',  label: 'Phone',  icon: Phone },
-  { type: 'email',  label: 'Email',  icon: Mail },
-  { type: 'file',   label: 'Files',  icon: FileText },
+// ── Map Popup ──────────────────────────────────────────────────────────────────
+function MapPopup({ location, onClose }: { location: string; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const query = encodeURIComponent(location);
+  const src = `https://www.openstreetmap.org/export/embed.html?bbox=-180,-90,180,90&layer=mapnik&marker=0,0&mlat=0&mlon=0&query=${query}#map=14/${query}`;
+  // Use a search URL approach via iframe
+  const embedUrl = `https://maps.google.com/maps?q=${query}&output=embed&z=14`;
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: 'absolute', zIndex: 9999, top: '100%', left: 0,
+        width: 320, background: '#fff', borderRadius: 10,
+        boxShadow: '0 8px 32px rgba(0,0,0,0.18)', overflow: 'hidden',
+        border: '1px solid #e0e0e0', marginTop: 4,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+        <span style={{ fontSize: 12, color: '#323338', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <MapPin size={13} color="#0073EA" /> {location}
+        </span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}>
+          <X size={14} color="#676879" />
+        </button>
+      </div>
+      <iframe
+        src={embedUrl}
+        width="320"
+        height="200"
+        style={{ border: 'none', display: 'block' }}
+        loading="lazy"
+        referrerPolicy="no-referrer-when-downgrade"
+      />
+      <a
+        href={`https://www.google.com/maps/search/?api=1&query=${query}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ display: 'block', textAlign: 'center', padding: '6px 0', fontSize: 11, color: '#0073EA', textDecoration: 'none', borderTop: '1px solid #f0f0f0' }}
+      >
+        Open in Google Maps ↗
+      </a>
+    </div>
+  );
+}
+
+const COL_TYPE_GROUPS = [
+  {
+    label: 'Essentials',
+    types: [
+      { type: 'status',   label: 'Status',   icon: AlignLeft,    bg: '#00C875' },
+      { type: 'dropdown', label: 'Dropdown', icon: ChevronDown,  bg: '#037F4C' },
+      { type: 'text',     label: 'Text',     icon: Type,         bg: '#FDAB3D' },
+      { type: 'date',     label: 'Date',     icon: Calendar,     bg: '#A25DDC' },
+      { type: 'people',   label: 'People',   icon: Users,        bg: '#0073EA' },
+      { type: 'number',   label: 'Numbers',  icon: Hash,         bg: '#FDAB3D' },
+    ],
+  },
+  {
+    label: 'Super useful',
+    types: [
+      { type: 'file',      label: 'Files',          icon: FileText,    bg: '#FF7575' },
+      { type: 'checkbox',  label: 'Checkbox',       icon: Check,       bg: '#FF642E' },
+      { type: 'doc',       label: 'monday Doc',     icon: FileText,    bg: '#E2445C' },
+      { type: 'formula',   label: 'Formula',        icon: Sparkles,    bg: '#00C875' },
+      { type: 'connect',   label: 'Connect boards', icon: Share2,      bg: '#E2445C' },
+      { type: 'timeline',  label: 'Timeline',       icon: Calendar,    bg: '#A25DDC' },
+      { type: 'phone',     label: 'Phone',          icon: Phone,       bg: '#0073EA' },
+      { type: 'email',     label: 'Email',          icon: Mail,        bg: '#037F4C' },
+    ],
+  },
 ];
 
 // ── Pill dropdown ──────────────────────────────────────────────────────────────
@@ -470,6 +546,125 @@ function OwnerAvatar({ name, size = 26 }: { name?: string; size?: number }) {
   );
 }
 
+// ── People cell ────────────────────────────────────────────────────────────────
+function PeopleCell() {
+  const [assigned, setAssigned] = useState<string[]>([]);
+  const [open, setOpen]         = useState(false);
+  const [search, setSearch]     = useState('');
+  const [muted, setMuted]       = useState(false);
+  const [people, setPeople]     = useState<User[]>([]);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    usersApi.getAll().then(setPeople).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const filtered = people.filter(p =>
+    p.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  function toggle(id: string) {
+    setAssigned(prev => prev.includes(id) ? prev.filter(n => n !== id) : [...prev, id]);
+  }
+
+  const assignedUsers = assigned.map(id => people.find(p => p.id === id)).filter(Boolean) as User[];
+
+  return (
+    <div ref={ref} style={{ position: 'relative', padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 40 }}>
+      {/* Cell display */}
+      <div onClick={() => setOpen(p => !p)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: -4 }}>
+        {assignedUsers.length === 0 ? (
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#F0F1F7', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px dashed #C5C7D4' }}>
+            <Users size={13} color="#C5C7D4" />
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            {assignedUsers.slice(0, 3).map((u, i) => (
+              <div key={u.id} title={u.name} style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: avatarColor(u.name), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', border: '2px solid #fff', marginLeft: i > 0 ? -8 : 0, zIndex: assignedUsers.length - i }}>
+                {initials(u.name)}
+              </div>
+            ))}
+            {assignedUsers.length > 3 && (
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#E6E9EF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#676879', border: '2px solid #fff', marginLeft: -8 }}>
+                +{assignedUsers.length - 3}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 2000, background: '#fff', borderRadius: 10,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.16)', border: '1px solid #E6E9EF',
+          width: 300, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        }}>
+          {/* Search */}
+          <div style={{ padding: '10px 12px', borderBottom: '1px solid #F0F1F7' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px solid #D0D4E4', borderRadius: 8, padding: '6px 10px' }}>
+              <Search size={14} color="#676879" />
+              <input autoFocus value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Search names, roles or teams"
+                style={{ border: 'none', outline: 'none', fontSize: 13, fontFamily: 'inherit', flex: 1, color: '#323338', background: 'transparent' }} />
+            </div>
+          </div>
+          {/* Suggested people */}
+          <div style={{ padding: '8px 0', maxHeight: 220, overflowY: 'auto' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#676879', padding: '0 12px 6px', textTransform: 'uppercase', letterSpacing: 0.5 }}>Suggested people</div>
+            {filtered.map(p => (
+              <div key={p.id} onClick={() => toggle(p.id)}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px', cursor: 'pointer', background: assigned.includes(p.id) ? '#F0F7FF' : 'transparent' }}
+                onMouseEnter={e => { if (!assigned.includes(p.id)) (e.currentTarget as HTMLElement).style.background = '#F5F6F8'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = assigned.includes(p.id) ? '#F0F7FF' : 'transparent'; }}>
+                <div style={{ width: 30, height: 30, borderRadius: '50%', backgroundColor: avatarColor(p.name), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                  {initials(p.name)}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, color: '#323338', fontWeight: 500 }}>{p.name}</div>
+                  <div style={{ fontSize: 11, color: '#676879' }}>{p.email}</div>
+                </div>
+                {assigned.includes(p.id) && <Check size={14} color="#0073EA" />}
+              </div>
+            ))}
+            {filtered.length === 0 && (
+              <div style={{ padding: '12px', fontSize: 13, color: '#676879', textAlign: 'center' }}>No results</div>
+            )}
+          </div>
+          {/* Notification banner */}
+          {assignedUsers.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#EEF6FF', borderTop: '1px solid #E6E9EF' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#323338' }}>
+                <AlertCircle size={13} color="#0073EA" /> Assignees will be notified
+              </div>
+              <button onClick={() => setMuted(m => !m)}
+                style={{ fontSize: 12, padding: '3px 10px', borderRadius: 6, border: '1px solid #D0D4E4', background: muted ? '#E6E9EF' : '#fff', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>
+                {muted ? 'Unmute' : 'Mute'}
+              </button>
+            </div>
+          )}
+          {/* Auto-assign */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 12px', borderTop: '1px solid #F0F1F7', cursor: 'pointer', fontSize: 13, color: '#323338', fontWeight: 500 }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#F5F6F8')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+            <Sparkles size={14} color="#0073EA" /> Auto-assign people
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Error toast ────────────────────────────────────────────────────────────────
 function ErrorToast({ message, onClose }: { message: string; onClose: () => void }) {
   useEffect(() => { const t = setTimeout(onClose, 4000); return () => clearTimeout(t); }, [onClose]);
@@ -484,39 +679,97 @@ function ErrorToast({ message, onClose }: { message: string; onClose: () => void
 
 // ── Add Column Modal ───────────────────────────────────────────────────────────
 function AddColumnModal({ onClose, onAdd }: { onClose: () => void; onAdd: (col: ColDef) => void }) {
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<{ type: string; label: string; bg: string } | null>(null);
   const [colName, setColName] = useState('');
-  const [colType, setColType] = useState('text');
+  const allTypes = COL_TYPE_GROUPS.flatMap(g => g.types);
+  const filtered = search.trim()
+    ? allTypes.filter(t => t.label.toLowerCase().includes(search.toLowerCase()))
+    : null;
+
+  function handleAdd() {
+    const name = colName.trim() || selected?.label || 'Column';
+    const prefix = selected?.type === 'people' ? '_people_' : '_custom_';
+    const width  = selected?.type === 'people' ? 120 : 150;
+    onAdd({ key: `${prefix}${Date.now()}`, label: name, width, align: selected?.type === 'people' ? 'center' : undefined });
+    onClose();
+  }
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' }} onMouseDown={onClose}>
-      <div style={{ backgroundColor: '#fff', borderRadius: 10, padding: '24px 28px', width: 380, fontFamily: 'Roboto, sans-serif', boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }} onMouseDown={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 600, color: '#323338', margin: 0 }}>Add column</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={18} color="#676879" /></button>
-        </div>
-        <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#323338', marginBottom: 6 }}>Column name</label>
-        <input autoFocus value={colName} onChange={e => setColName(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && colName.trim()) { onAdd({ key: `_custom_${Date.now()}`, label: colName.trim(), width: 140 }); onClose(); } }}
-          placeholder="e.g. Contact name, Region..."
-          style={{ width: '100%', padding: '9px 12px', borderRadius: 6, border: '1px solid #D0D4E4', fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', marginBottom: 14 }}
-          onFocus={e => (e.target.style.borderColor = '#0073EA')} onBlur={e => (e.target.style.borderColor = '#D0D4E4')}
-        />
-        <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#323338', marginBottom: 8 }}>Column type</label>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
-          {CUSTOM_COL_TYPES.map(({ type, label, icon: Icon }) => (
-            <button key={type} onClick={() => setColType(type)}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 6, border: `1px solid ${colType === type ? '#0073EA' : '#D0D4E4'}`, backgroundColor: colType === type ? '#E5F0FF' : '#fff', cursor: 'pointer', fontSize: 13, color: colType === type ? '#0073EA' : '#323338', fontFamily: 'inherit', fontWeight: colType === type ? 600 : 400 }}>
-              <Icon size={15} color={colType === type ? '#0073EA' : '#676879'} />{label}
-            </button>
-          ))}
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button onClick={onClose} style={{ padding: '8px 18px', borderRadius: 6, border: '1px solid #D0D4E4', background: '#fff', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
-          <button onClick={() => { if (colName.trim()) { onAdd({ key: `_custom_${Date.now()}`, label: colName.trim(), width: 140 }); onClose(); } }}
-            disabled={!colName.trim()}
-            style={{ padding: '8px 18px', borderRadius: 6, border: 'none', backgroundColor: !colName.trim() ? '#D0D4E4' : '#0073EA', color: '#fff', fontSize: 13, fontWeight: 600, cursor: !colName.trim() ? 'default' : 'pointer', fontFamily: 'inherit' }}>
-            Add column
-          </button>
-        </div>
+      <div style={{ backgroundColor: '#fff', borderRadius: 12, width: 400, fontFamily: 'Roboto, sans-serif', boxShadow: '0 16px 48px rgba(0,0,0,0.22)', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '85vh' }} onMouseDown={e => e.stopPropagation()}>
+
+        {selected ? (
+          /* ── Step 2: Name input ── */
+          <div style={{ padding: '24px 24px 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+              <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', color: '#676879', padding: 4 }}>
+                <ChevronRight size={18} style={{ transform: 'rotate(180deg)' }} />
+              </button>
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: selected.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {(() => { const t = allTypes.find(x => x.type === selected.type); return t ? <t.icon size={18} color="#fff" /> : null; })()}
+              </div>
+              <span style={{ fontSize: 15, fontWeight: 600, color: '#323338' }}>{selected.label}</span>
+            </div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#323338', marginBottom: 6 }}>Column name</label>
+            <input autoFocus value={colName} onChange={e => setColName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAdd()}
+              placeholder={selected.label}
+              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #D0D4E4', fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', marginBottom: 20 }}
+              onFocus={e => (e.target.style.borderColor = '#0073EA')} onBlur={e => (e.target.style.borderColor = '#D0D4E4')} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button onClick={onClose} style={{ padding: '8px 18px', borderRadius: 6, border: '1px solid #D0D4E4', background: '#fff', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+              <button onClick={handleAdd} style={{ padding: '8px 20px', borderRadius: 6, border: 'none', background: '#0073EA', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Create column
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* ── Step 1: Type picker ── */
+          <>
+            {/* Search */}
+            <div style={{ padding: '16px 16px 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: '2px solid #0073EA', borderRadius: 8, padding: '8px 12px' }}>
+                <Search size={16} color="#676879" />
+                <input autoFocus value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder="Search or describe your column"
+                  style={{ border: 'none', outline: 'none', fontSize: 14, fontFamily: 'inherit', flex: 1, color: '#323338', background: 'transparent' }} />
+              </div>
+            </div>
+            {/* Type list */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+              {(filtered ? [{ label: 'Results', types: filtered }] : COL_TYPE_GROUPS).map(group => (
+                <div key={group.label} style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: '#676879', fontWeight: 500, marginBottom: 8, padding: '0 4px' }}>{group.label}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                    {group.types.map(({ type, label, icon: Icon, bg }) => (
+                      <button key={type} onClick={() => { setSelected({ type, label, bg }); setColName(''); }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 8, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
+                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F5F6F8')}
+                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
+                        <div style={{ width: 34, height: 34, borderRadius: 8, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Icon size={17} color="#fff" />
+                        </div>
+                        <span style={{ fontSize: 14, color: '#323338' }}>{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              {filtered && filtered.length === 0 && (
+                <div style={{ textAlign: 'center', color: '#676879', fontSize: 13, padding: '24px 0' }}>No columns found</div>
+              )}
+            </div>
+            {/* More columns */}
+            <div style={{ borderTop: '1px solid #E6E9EF', padding: '14px 16px', textAlign: 'center' }}>
+              <button style={{ background: 'none', border: 'none', fontSize: 14, color: '#323338', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#0073EA')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#323338')}>
+                More columns
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -581,14 +834,257 @@ function EmptyBoard({ onAddGroup }: { onAddGroup: () => void }) {
   );
 }
 
+// ── Column header with context menu ───────────────────────────────────────────
+const COL_QUICK_TYPES = [
+  { type: 'status',   label: 'Status',   icon: AlignLeft, bg: '#00C875' },
+  { type: 'text',     label: 'Text',     icon: Type,      bg: '#FDAB3D' },
+  { type: 'people',   label: 'People',   icon: Users,     bg: '#0073EA' },
+  { type: 'timeline', label: 'Timeline', icon: AlignJustify, bg: '#A25DDC' },
+  { type: 'date',     label: 'Date',     icon: Calendar,  bg: '#A25DDC' },
+  { type: 'number',   label: 'Numbers',  icon: Hash,      bg: '#FDAB3D' },
+];
+
+function ColHeaderTh({ col, isCustom, onRename, onDelete, onDuplicate, onAddRight }: {
+  col: ColDef;
+  isCustom?: boolean;
+  onRename?: (newLabel: string) => void;
+  onDelete?: () => void;
+  onDuplicate?: (withValues: boolean) => void;
+  onAddRight?: (afterKey: string, type: string, label: string) => void;
+}) {
+  const [hovered,       setHovered]       = useState(false);
+  const [menuOpen,      setMenuOpen]       = useState(false);
+  const [activeSubmenu, setActiveSubmenu]  = useState<string | null>(null);
+  const [renaming,      setRenaming]       = useState(false);
+  const [renameVal,     setRenameVal]      = useState(col.label);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setRenameVal(col.label); }, [col.label]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function h(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false); setActiveSubmenu(null);
+      }
+    }
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [menuOpen]);
+
+  const close = () => { setMenuOpen(false); setActiveSubmenu(null); };
+
+  // ── Submenu panels ────────────────────────────────────────────────────────
+  const SubItem = ({ children, onClick, disabled, danger }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean; danger?: boolean }) => (
+    <div onClick={onClick}
+      style={{ padding: '10px 16px', fontSize: 14, cursor: disabled ? 'default' : 'pointer', color: disabled ? '#C5C7D4' : danger ? '#E2445C' : '#323338' }}
+      onMouseEnter={e => { if (!disabled) (e.currentTarget as HTMLElement).style.background = '#F5F6F8'; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+      {children}
+    </div>
+  );
+
+  const submenus: Record<string, React.ReactNode> = {
+    settings: (
+      <div style={{ minWidth: 270, padding: '6px 0' }}>
+        <SubItem><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Info size={15} color="#676879" /><span>Customize <strong>{col.label}</strong> column</span></div></SubItem>
+        <SubItem><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><AlignJustify size={15} color="#676879" /><span>Add description</span></div></SubItem>
+        <div style={{ height: 1, background: '#F0F1F7', margin: '4px 0' }} />
+        <SubItem><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Lock size={15} color="#676879" /><span>Restrict column editing</span></div></SubItem>
+        <SubItem><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Eye size={15} color="#676879" /><span>Restrict column view</span></div></SubItem>
+        <div style={{ height: 1, background: '#F0F1F7', margin: '4px 0' }} />
+        <SubItem disabled><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Star size={15} color="#C5C7D4" /><span>Save column as a template</span></div></SubItem>
+      </div>
+    ),
+    sort: (
+      <div style={{ minWidth: 230, padding: '6px 0' }}>
+        <SubItem><span style={{ fontSize: 14, color: '#323338' }}>Sort column</span></SubItem>
+        <SubItem disabled>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Add subsort</span><span style={{ fontSize: 12, color: '#C5C7D4' }}>⌘ Click</span>
+          </div>
+        </SubItem>
+        <SubItem disabled>Save order of items</SubItem>
+      </div>
+    ),
+    duplicate: (
+      <div style={{ minWidth: 210, padding: '6px 0' }}>
+        <SubItem onClick={() => { onDuplicate?.(false); close(); }}>Column only</SubItem>
+        <SubItem onClick={() => { onDuplicate?.(true); close(); }}>Column and cell values</SubItem>
+      </div>
+    ),
+    addRight: (
+      <div style={{ minWidth: 200, padding: '6px 0' }}>
+        {COL_QUICK_TYPES.map(t => (
+          <div key={t.type} onClick={() => { onAddRight?.(String(col.key), t.type, t.label); close(); }}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', cursor: 'pointer', fontSize: 14, color: '#323338' }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#F5F6F8')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: t.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <t.icon size={15} color="#fff" />
+            </div>
+            {t.label}
+          </div>
+        ))}
+        <div style={{ height: 1, background: '#F0F1F7', margin: '4px 0' }} />
+        <SubItem>More columns</SubItem>
+      </div>
+    ),
+    changeType: (
+      <div style={{ minWidth: 230, padding: '6px 0' }}>
+        <div style={{ padding: '8px 16px 10px', fontSize: 13, color: '#676879' }}>
+          Change <strong style={{ color: '#323338' }}>{col.label}</strong> column to:
+        </div>
+        {COL_QUICK_TYPES.map(t => (
+          <div key={t.type} onClick={() => close()}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', cursor: 'pointer', fontSize: 14, color: '#323338' }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#F5F6F8')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: t.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <t.icon size={15} color="#fff" />
+            </div>
+            {t.label}
+          </div>
+        ))}
+      </div>
+    ),
+  };
+
+  // ── Menu rows ─────────────────────────────────────────────────────────────
+  type MenuRow = { key: string; icon: React.ReactNode; label: string; chevron?: boolean; disabled?: boolean; danger?: boolean; action?: () => void; submenu?: string };
+  const sections: MenuRow[][] = [
+    [{ key: 'settings', icon: <Settings size={15} />, label: 'Settings', chevron: true, submenu: 'settings' }],
+    [
+      { key: 'filter',   icon: <Filter size={15} />,          label: 'Filter'   },
+      { key: 'sort',     icon: <ArrowUpDown size={15} />,     label: 'Sort',     chevron: true, submenu: 'sort' },
+      { key: 'collapse', icon: <ChevronsUpDown size={15} />,  label: 'Collapse' },
+      { key: 'groupby',  icon: <LayoutGrid size={15} />,      label: 'Group by' },
+    ],
+    [
+      { key: 'duplicate',   icon: <Copy size={15} />,         label: 'Duplicate column',       chevron: true, submenu: 'duplicate' },
+      { key: 'addRight',    icon: <Plus size={15} />,         label: 'Add column to the right', chevron: true, submenu: 'addRight' },
+      { key: 'changeType',  icon: <ArrowLeftRight size={15} />, label: 'Change column type',   chevron: true, submenu: 'changeType' },
+    ],
+    [{ key: 'extensions', icon: <Layers size={15} />, label: 'Column extensions', chevron: true, disabled: true }],
+    [
+      { key: 'rename', icon: <Pencil size={15} />, label: 'Rename', action: () => { close(); setRenaming(true); } },
+      { key: 'delete', icon: <Trash2 size={15} />, label: 'Delete', danger: true, action: () => { onDelete?.(); close(); } },
+    ],
+  ];
+
+  return (
+    <th onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+      style={{ padding: 0, textAlign: (col.align ?? 'left') as 'left'|'center', fontWeight: 500, color: '#676879', fontSize: 14, backgroundColor: '#fff', borderBottom: '1px solid #E6E9EF', borderRight: '1px solid #E6E9EF', whiteSpace: 'nowrap', userSelect: 'none', position: 'relative' }}>
+      {/* Header label row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '11px 12px', justifyContent: col.align === 'center' ? 'center' : 'flex-start' }}>
+        {renaming ? (
+          <input autoFocus value={renameVal} onChange={e => setRenameVal(e.target.value)}
+            onBlur={() => { if (renameVal.trim()) onRename?.(renameVal.trim()); setRenaming(false); }}
+            onKeyDown={e => { if (e.key === 'Enter' && renameVal.trim()) { onRename?.(renameVal.trim()); setRenaming(false); } if (e.key === 'Escape') setRenaming(false); }}
+            style={{ border: 'none', outline: '2px solid #0073EA', borderRadius: 4, padding: '2px 6px', fontSize: 14, fontFamily: 'inherit', color: '#323338', width: Math.max(60, renameVal.length * 9) }} />
+        ) : <span>{col.label}</span>}
+        {hovered && !renaming && (
+          <button onClick={e => { e.stopPropagation(); setMenuOpen(p => !p); if (menuOpen) setActiveSubmenu(null); }}
+            style={{ marginLeft: 4, background: menuOpen ? '#E6E9EF' : 'none', border: 'none', borderRadius: 4, cursor: 'pointer', padding: '2px 6px', display: 'flex', alignItems: 'center', color: '#676879' }}>
+            <MoreHorizontal size={15} />
+          </button>
+        )}
+      </div>
+
+      {/* Main context menu */}
+      {menuOpen && (
+        <div ref={menuRef} style={{ position: 'absolute', top: '100%', left: 0, zIndex: 3000, background: '#fff', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.16)', border: '1px solid #E6E9EF', minWidth: 260, overflow: 'visible' }} onClick={e => e.stopPropagation()}>
+          {sections.filter(s => s.length > 0).map((section, si) => (
+            <div key={si}>
+              {si > 0 && <div style={{ height: 1, background: '#F0F1F7' }} />}
+              {section.map(row => (
+                <div key={row.key}
+                  style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', cursor: row.disabled ? 'default' : 'pointer', fontSize: 14, background: activeSubmenu === row.key ? '#F5F6F8' : 'transparent', color: row.disabled ? '#C5C7D4' : row.danger ? '#E2445C' : '#323338' }}
+                  onMouseEnter={() => { setActiveSubmenu(row.submenu ?? null); if (!row.submenu && !row.action) setActiveSubmenu(null); }}
+                  onClick={() => { if (!row.disabled && row.action) row.action(); }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ opacity: row.disabled ? 0.4 : 1, display: 'flex' }}>{row.icon}</span>
+                    {row.label}
+                  </span>
+                  {row.chevron && <ChevronRight size={14} color={row.disabled ? '#C5C7D4' : '#9aacbb'} />}
+                  {/* Submenu panel */}
+                  {activeSubmenu === row.key && row.submenu && submenus[row.submenu] && (
+                    <div style={{ position: 'absolute', top: 0, right: '100%', marginRight: 4, zIndex: 3001, background: '#fff', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.16)', border: '1px solid #E6E9EF', overflow: 'hidden' }}>
+                      {submenus[row.submenu]}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </th>
+  );
+}
+
 // ── Group block ────────────────────────────────────────────────────────────────
-function GroupBlock({ group, boardId, onUpdate, onDelete, cols, onError, onOpenUpdates }: {
+interface SortConfig { field: string; dir: 'asc' | 'desc' }
+interface FilterConfig { id: string; field: string; condition: string; value: string }
+
+const FILTER_CONDITIONS = [
+  { value: 'contains',     label: 'contains' },
+  { value: 'not_contains', label: 'does not contain' },
+  { value: 'equals',       label: 'is' },
+  { value: 'not_equals',   label: 'is not' },
+  { value: 'is_empty',     label: 'is empty' },
+  { value: 'is_not_empty', label: 'is not empty' },
+];
+
+function applyFilters(items: BoardItem[], filters: FilterConfig[]): BoardItem[] {
+  const active = filters.filter(f => f.field);
+  if (!active.length) return items;
+  return items.filter(item => active.every(f => {
+    const raw = (item as unknown as Record<string, unknown>)[f.field];
+    const val = raw != null ? String(raw).toLowerCase() : '';
+    const fval = f.value.toLowerCase();
+    switch (f.condition) {
+      case 'contains':     return val.includes(fval);
+      case 'not_contains': return !val.includes(fval);
+      case 'equals':       return val === fval;
+      case 'not_equals':   return val !== fval;
+      case 'is_empty':     return val === '';
+      case 'is_not_empty': return val !== '';
+      default: return true;
+    }
+  }));
+}
+
+function sortItems(items: BoardItem[], sorts: SortConfig[]): BoardItem[] {
+  if (!sorts.length) return items;
+  return [...items].sort((a, b) => {
+    for (const sort of sorts) {
+      const av = (a as unknown as Record<string, unknown>)[sort.field];
+      const bv = (b as unknown as Record<string, unknown>)[sort.field];
+      const an = av == null ? '' : String(av).toLowerCase();
+      const bn = bv == null ? '' : String(bv).toLowerCase();
+      const num_a = parseFloat(an), num_b = parseFloat(bn);
+      const cmp = (!isNaN(num_a) && !isNaN(num_b)) ? num_a - num_b : an.localeCompare(bn);
+      if (cmp !== 0) return sort.dir === 'asc' ? cmp : -cmp;
+    }
+    return 0;
+  });
+}
+
+function GroupBlock({ group, boardId, onUpdate, onDelete, cols, onError, onOpenUpdates, sortConfigs, filterConfigs, readOnly, onRenameCol, onDeleteCol, onDuplicateCol }: {
   group: BoardGroup; boardId: string;
   onUpdate: (g: BoardGroup) => void;
   onDelete: (id: string) => void;
   cols: ColDef[];
   onError: (msg: string) => void;
   onOpenUpdates: (item: BoardItem, groupId: string) => void;
+  sortConfigs?: SortConfig[];
+  filterConfigs?: FilterConfig[];
+  readOnly?: boolean;
+  onRenameCol?: (key: string, newLabel: string) => void;
+  onDeleteCol?: (key: string) => void;
+  onDuplicateCol?: (col: ColDef, withValues: boolean) => void;
+  onAddColRight?: (afterKey: string, type: string, label: string) => void;
 }) {
   const [collapsed, setCollapsed]   = useState(false);
   const [addingItem, setAddingItem] = useState(false);
@@ -598,6 +1094,7 @@ function GroupBlock({ group, boardId, onUpdate, onDelete, cols, onError, onOpenU
   const [hoverRow, setHoverRow]         = useState<string | null>(null);
   const [savingFields, setSavingFields] = useState<Record<string, boolean>>({});
   const [focusedCell, setFocusedCell]   = useState<{ itemId: string; field: string } | null>(null);
+  const [mapPopupItemId, setMapPopupItemId] = useState<string | null>(null);
 
   // Local draft state: { [itemId]: { [field]: draftValue } }
   const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>({});
@@ -850,11 +1347,18 @@ function GroupBlock({ group, boardId, onUpdate, onDelete, cols, onError, onOpenU
     if (key === 'notes')            return editCell('notes', { placeholder: 'Add note...' });
 
     if (key === 'location') return (
-      <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-        <span style={{ paddingLeft: 12, flexShrink: 0 }}>
-          {item.location ? <MapPin size={13} color="#676879" /> : null}
+      <div style={{ display: 'flex', alignItems: 'center', width: '100%', position: 'relative' }}>
+        <span
+          style={{ paddingLeft: 12, flexShrink: 0, cursor: item.location ? 'pointer' : 'default', display: 'flex', alignItems: 'center' }}
+          onClick={e => { e.stopPropagation(); if (item.location) setMapPopupItemId(mapPopupItemId === item.id ? null : item.id); }}
+          title={item.location ? 'View on map' : undefined}
+        >
+          {item.location ? <MapPin size={13} color={mapPopupItemId === item.id ? '#0073EA' : '#676879'} /> : null}
         </span>
         {editCell('location', { placeholder: 'Location...' })}
+        {mapPopupItemId === item.id && item.location && (
+          <MapPopup location={item.location} onClose={() => setMapPopupItemId(null)} />
+        )}
       </div>
     );
 
@@ -912,6 +1416,8 @@ function GroupBlock({ group, boardId, onUpdate, onDelete, cols, onError, onOpenU
       </div>
     );
 
+    if (key.startsWith('_people_')) return <PeopleCell />;
+
     if (key.startsWith('_custom_')) return (
       <input placeholder="—"
         style={{ width: '100%', border: 'none', background: 'transparent', outline: 'none', fontSize: 15, color: '#323338', fontFamily: 'inherit', padding: '10px 12px' }} />
@@ -953,15 +1459,19 @@ function GroupBlock({ group, boardId, onUpdate, onDelete, cols, onError, onOpenU
               <tr>
                 <th style={{ width: 64, backgroundColor: '#fff', borderBottom: '1px solid #E6E9EF', borderRight: '1px solid #E6E9EF' }} />
                 {cols.map(c => (
-                  <th key={String(c.key)} style={{ padding: '11px 12px', textAlign: (c.align ?? 'left') as 'left' | 'center', fontWeight: 500, color: '#676879', fontSize: 14, backgroundColor: '#fff', borderBottom: '1px solid #E6E9EF', borderRight: '1px solid #E6E9EF', whiteSpace: 'nowrap', userSelect: 'none' }}>
-                    {c.label}
-                  </th>
+                  <ColHeaderTh key={String(c.key)} col={c}
+                    isCustom={String(c.key).startsWith('_custom_') || String(c.key).startsWith('_people_')}
+                    onRename={lbl => onRenameCol?.(String(c.key), lbl)}
+                    onDelete={() => onDeleteCol?.(String(c.key))}
+                    onDuplicate={(withValues) => onDuplicateCol?.(c, withValues)}
+                    onAddRight={(afterKey, type, label) => onAddColRight?.(afterKey, type, label)}
+                  />
                 ))}
                 <th style={{ backgroundColor: '#fff', borderBottom: '1px solid #E6E9EF' }} />
               </tr>
             </thead>
             <tbody>
-              {items.map(item => (
+              {sortItems(applyFilters(items, filterConfigs ?? []), sortConfigs ?? []).map(item => (
                 <tr key={item.id}
                   onMouseEnter={() => setHoverRow(item.id)} onMouseLeave={() => setHoverRow(null)}
                   style={{ backgroundColor: hoverRow === item.id ? '#F5F7FF' : '#fff', transition: 'background 0.1s' }}>
@@ -1068,12 +1578,55 @@ export default function BoardPage() {
   const [activeTab, setActiveTab] = useState(0);
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [showAddCol,   setShowAddCol]   = useState(false);
-  const [extraCols, setExtraCols] = useState<ColDef[]>([]);
+  const [extraCols,   setExtraCols]   = useState<ColDef[]>([]);
+  const [hiddenCols,  setHiddenCols]  = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [groupLoading, setGroupLoading] = useState(false);
   const [updatesPanel, setUpdatesPanel] = useState<{ item: BoardItem; groupId: string } | null>(null);
+  const [sortConfigs,     setSortConfigs]     = useState<SortConfig[]>([]);
+  const [groupByField,    setGroupByField]    = useState<string | null>(null);
+  const [groupByDir,      setGroupByDir]      = useState<'asc' | 'desc'>('asc');
+  const [showEmptyGroups, setShowEmptyGroups] = useState(false);
+  const [showSort,        setShowSort]        = useState(false);
+  const [showGroupBy,     setShowGroupBy]     = useState(false);
+  const [showFilter,      setShowFilter]      = useState(false);
+  const [filterConfigs,   setFilterConfigs]   = useState<FilterConfig[]>([]);
 
-  const allCols = [...BASE_COLS, ...extraCols];
+  const allCols = [...BASE_COLS, ...extraCols].filter(c => !hiddenCols.has(String(c.key)));
+
+  function handleRenameCol(key: string, newLabel: string) {
+    setExtraCols(prev => prev.map(c => String(c.key) === key ? { ...c, label: newLabel } : c));
+  }
+  function handleDeleteCol(key: string) {
+    // For extra cols: remove entirely; for base cols: hide
+    const isBase = BASE_COLS.some(c => String(c.key) === key);
+    if (isBase) {
+      setHiddenCols(prev => new Set([...prev, key]));
+    } else {
+      setExtraCols(prev => prev.filter(c => String(c.key) !== key));
+    }
+  }
+  function handleDuplicateCol(col: ColDef, _withValues: boolean) {
+    setExtraCols(prev => {
+      const allIdx = [...BASE_COLS, ...prev].findIndex(c => String(c.key) === String(col.key));
+      const extraIdx = prev.findIndex(c => String(c.key) === String(col.key));
+      const prefix = String(col.key).startsWith('_people_') ? '_people_' : '_custom_';
+      const copy: ColDef = { ...col, key: `${prefix}${Date.now()}`, label: `${col.label} (copy)` };
+      if (extraIdx >= 0) { const next = [...prev]; next.splice(extraIdx + 1, 0, copy); return next; }
+      void allIdx;
+      return [...prev, copy];
+    });
+  }
+  function handleAddColRight(afterKey: string, type: string, label: string) {
+    setExtraCols(prev => {
+      const prefix = type === 'people' ? '_people_' : '_custom_';
+      const newCol: ColDef = { key: `${prefix}${Date.now()}`, label, width: type === 'people' ? 120 : 150, align: type === 'people' ? 'center' : undefined };
+      const extraIdx = prev.findIndex(c => String(c.key) === afterKey);
+      if (extraIdx >= 0) { const next = [...prev]; next.splice(extraIdx + 1, 0, newCol); return next; }
+      // afterKey is a BASE_COL — insert at beginning of extraCols
+      return [newCol, ...prev];
+    });
+  }
 
   // Sticky horizontal scrollbar
   const contentRef   = useRef<HTMLDivElement>(null);
@@ -1093,6 +1646,39 @@ export default function BoardPage() {
     contentRef.current.scrollLeft = stickyBarRef.current.scrollLeft;
     syncing.current = false;
   }, []);
+
+  // ── Close sort popup on outside click ───────────────────────────────────────
+  useEffect(() => {
+    if (!showSort) return;
+    function handle(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-sort-popup]')) setShowSort(false);
+    }
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, [showSort]);
+
+  // ── Close filter popup on outside click ─────────────────────────────────────
+  useEffect(() => {
+    if (!showFilter) return;
+    function handle(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-filter-popup]')) setShowFilter(false);
+    }
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, [showFilter]);
+
+  // ── Close group-by popup on outside click ────────────────────────────────────
+  useEffect(() => {
+    if (!showGroupBy) return;
+    function handle(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-groupby-popup]')) setShowGroupBy(false);
+    }
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, [showGroupBy]);
 
   // ── Load board + groups from DB ──────────────────────────────────────────────
   useEffect(() => {
@@ -1167,56 +1753,375 @@ export default function BoardPage() {
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '9px 24px', borderBottom: '1px solid #E6E9EF', flexShrink: 0 }}>
-        <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', marginRight: 6 }}>
-          <button onClick={() => setShowNewGroup(true)} disabled={groupLoading}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 13px', backgroundColor: '#0073EA', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: groupLoading ? 0.7 : 1 }}>
-            <Plus size={14} /> New task
+      {/* Toolbar — only shown on Main table tab */}
+      {activeTab === 0 && <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '9px 24px', borderBottom: '1px solid #E6E9EF' }}>
+          <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', marginRight: 6 }}>
+            <button onClick={() => setShowNewGroup(true)} disabled={groupLoading}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 13px', backgroundColor: '#0073EA', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: groupLoading ? 0.7 : 1 }}>
+              <Plus size={14} /> New task
+            </button>
+            <button style={{ display: 'flex', alignItems: 'center', padding: '7px 7px', backgroundColor: '#0073EA', color: '#fff', border: 'none', borderLeft: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer' }}>
+              <ChevronDown size={13} />
+            </button>
+          </div>
+          {/* Search / Person */}
+          {[
+            { label: 'Search', icon: Search },
+            { label: 'Person', icon: Users },
+          ].map(({ label, icon: Icon }) => (
+            <button key={label}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', background: 'none', border: 'none', borderRadius: 6, fontSize: 13, color: '#676879', cursor: 'pointer', fontFamily: 'inherit' }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F5F6F8')}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
+              <Icon size={14} /> {label}
+            </button>
+          ))}
+          {/* Filter button + popup */}
+          <div data-filter-popup style={{ position: 'relative' }}>
+            <button onClick={() => { setShowFilter(p => { if (!p && filterConfigs.length === 0) setFilterConfigs([{ id: String(Date.now()), field: '', condition: 'contains', value: '' }]); return !p; }); setShowSort(false); setShowGroupBy(false); }}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px',
+                background: showFilter || filterConfigs.some(f => f.field) ? '#E8F0FE' : 'none', border: 'none', borderRadius: 6, fontSize: 13,
+                color: showFilter || filterConfigs.some(f => f.field) ? '#0073EA' : '#676879',
+                cursor: 'pointer', fontFamily: 'inherit', fontWeight: filterConfigs.some(f => f.field) ? 600 : 400 }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = showFilter || filterConfigs.some(f => f.field) ? '#E8F0FE' : '#F5F6F8')}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = showFilter || filterConfigs.some(f => f.field) ? '#E8F0FE' : 'transparent')}>
+              <Filter size={14} /> Filter
+              {filterConfigs.some(f => f.field) && <span style={{ background: '#0073EA', color: '#fff', borderRadius: 99, fontSize: 10, padding: '1px 5px', marginLeft: 2 }}>{filterConfigs.filter(f => f.field).length}</span>}
+            </button>
+            {showFilter && (() => {
+              const totalItems = groups.reduce((s, g) => s + g.items.length, 0);
+              const activeItems = filterConfigs.length > 0 ? groups.reduce((s, g) => s + applyFilters(g.items, filterConfigs).length, 0) : totalItems;
+              return (
+                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 1000, background: '#fff', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.16)', border: '1px solid #E6E9EF', width: 680, padding: '16px 20px' }}>
+                  {/* Header */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: '#323338' }}>Advanced filters</span>
+                      <span style={{ fontSize: 13, color: '#676879' }}>Showing {activeItems} of {totalItems} tasks</span>
+                      <Info size={13} color="#C5C7D4" />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {filterConfigs.some(f => f.field) && (
+                        <button onClick={() => setFilterConfigs([{ id: String(Date.now()), field: '', condition: 'contains', value: '' }])}
+                          style={{ fontSize: 13, color: '#676879', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '4px 8px', borderRadius: 6 }}
+                          onMouseEnter={e => (e.currentTarget.style.background = '#F5F6F8')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                          Clear all
+                        </button>
+                      )}
+                      <button style={{ fontSize: 13, color: '#323338', background: 'none', border: '1px solid #D0D4E4', cursor: 'pointer', fontFamily: 'inherit', padding: '5px 12px', borderRadius: 6, fontWeight: 500 }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#F5F6F8')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                        Save as new view
+                      </button>
+                    </div>
+                  </div>
+                  {/* Filter with AI toggle */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, padding: '10px 14px', background: '#FAFBFC', borderRadius: 8, border: '1px solid #F0F1F7' }}>
+                    <div style={{ position: 'relative', width: 40, height: 22, cursor: 'pointer' }} onClick={() => {}}>
+                      <div style={{ width: 40, height: 22, borderRadius: 11, background: '#D0D4E4' }} />
+                      <div style={{ position: 'absolute', top: 2, left: 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.2s' }} />
+                    </div>
+                    <span style={{ fontSize: 14, color: '#323338', fontWeight: 500 }}>Filter with AI</span>
+                  </div>
+                  {/* Filter rows */}
+                  {filterConfigs.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                      {filterConfigs.map((fc, idx) => {
+                        const needsValue = !['is_empty','is_not_empty'].includes(fc.condition);
+                        return (
+                          <div key={fc.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 13, color: '#676879', width: 40, flexShrink: 0 }}>{idx === 0 ? 'Where' : 'And'}</span>
+                            {/* Column */}
+                            <select value={fc.field} onChange={e => setFilterConfigs(prev => prev.map(f => f.id === fc.id ? { ...f, field: e.target.value } : f))}
+                              style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: '1px solid #D0D4E4', fontSize: 13, fontFamily: 'inherit', color: '#323338', cursor: 'pointer', background: '#fff', outline: 'none' }}>
+                              <option value="">Column</option>
+                              {allCols.filter(c => !String(c.key).startsWith('_people_')).map(c => (
+                                <option key={String(c.key)} value={String(c.key)}>{String(c.label)}</option>
+                              ))}
+                            </select>
+                            {/* Condition */}
+                            <select value={fc.condition} onChange={e => setFilterConfigs(prev => prev.map(f => f.id === fc.id ? { ...f, condition: e.target.value, value: '' } : f))}
+                              style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: '1px solid #D0D4E4', fontSize: 13, fontFamily: 'inherit', color: '#323338', cursor: 'pointer', background: '#fff', outline: 'none' }}>
+                              {FILTER_CONDITIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                            </select>
+                            {/* Value */}
+                            {needsValue ? (
+                              <input value={fc.value} onChange={e => setFilterConfigs(prev => prev.map(f => f.id === fc.id ? { ...f, value: e.target.value } : f))}
+                                placeholder="Value"
+                                style={{ flex: 2, padding: '7px 10px', borderRadius: 8, border: '1px solid #D0D4E4', fontSize: 13, fontFamily: 'inherit', color: '#323338', outline: 'none', background: '#fff' }}
+                                onFocus={e => (e.target.style.borderColor = '#0073EA')}
+                                onBlur={e => (e.target.style.borderColor = '#D0D4E4')} />
+                            ) : (
+                              <div style={{ flex: 2 }} />
+                            )}
+                            {/* Remove */}
+                            <button onClick={() => setFilterConfigs(prev => prev.filter(f => f.id !== fc.id))}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#C5C7D4', display: 'flex', padding: 4, borderRadius: 4, flexShrink: 0 }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#FFF0F0'; (e.currentTarget as HTMLElement).style.color = '#E2445C'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none'; (e.currentTarget as HTMLElement).style.color = '#C5C7D4'; }}>
+                              <X size={14} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {/* Bottom actions */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4 }}>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={() => setFilterConfigs(prev => [...prev, { id: String(Date.now()), field: '', condition: 'contains', value: '' }])}
+                        style={{ fontSize: 13, color: '#0073EA', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '5px 8px', borderRadius: 6, fontWeight: 500 }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#F0F7FF')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                        + New filter
+                      </button>
+                      <button style={{ fontSize: 13, color: '#676879', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '5px 8px', borderRadius: 6 }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#F5F6F8')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                        + New group
+                      </button>
+                    </div>
+                    <button style={{ fontSize: 13, color: '#676879', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '5px 8px', borderRadius: 6 }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#F5F6F8')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                      Switch to quick filters
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+          {/* Sort button with floating popup */}
+          <div data-sort-popup style={{ position: 'relative' }}>
+            <button onClick={() => { setShowSort(p => !p); setShowGroupBy(false); setShowFilter(false); }}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px',
+                background: showSort || sortConfigs.length > 0 ? '#E8F0FE' : 'none', border: 'none', borderRadius: 6, fontSize: 13,
+                color: showSort || sortConfigs.length > 0 ? '#0073EA' : '#676879',
+                cursor: 'pointer', fontFamily: 'inherit', fontWeight: sortConfigs.length > 0 ? 600 : 400 }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = showSort || sortConfigs.length > 0 ? '#E8F0FE' : '#F5F6F8')}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = showSort || sortConfigs.length > 0 ? '#E8F0FE' : 'transparent')}>
+              <ArrowUpDown size={14} /> Sort
+              {sortConfigs.length > 0 && <span style={{ background: '#0073EA', color: '#fff', borderRadius: 99, fontSize: 10, padding: '1px 5px', marginLeft: 2 }}>{sortConfigs.length}</span>}
+            </button>
+            {/* Sort popup */}
+            {showSort && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 1000,
+                background: '#fff', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.14), 0 1px 4px rgba(0,0,0,0.08)',
+                border: '1px solid #E6E9EF', padding: '16px 20px', minWidth: 520, display: 'flex', flexDirection: 'column', gap: 12,
+              }}>
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#323338', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    Sort by
+                    <span style={{ width: 16, height: 16, borderRadius: '50%', border: '1.5px solid #676879', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#676879', cursor: 'default' }}>?</span>
+                  </span>
+                  <button style={{ fontSize: 12, color: '#676879', background: '#fff', border: '1px solid #D0D4E4', cursor: 'pointer', fontFamily: 'inherit', padding: '4px 12px', borderRadius: 6, fontWeight: 500 }}>
+                    Save as new view
+                  </button>
+                </div>
+                {/* Sort rows */}
+                {sortConfigs.map((sc, idx) => {
+                  const usedFields = sortConfigs.filter((_, i) => i !== idx).map(s => s.field);
+                  return (
+                    <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      {/* Drag handle */}
+                      <span style={{ color: '#C5C7D4', cursor: 'grab', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                        <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="2" r="1.5"/><circle cx="8" cy="2" r="1.5"/><circle cx="2" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="2" cy="14" r="1.5"/><circle cx="8" cy="14" r="1.5"/></svg>
+                      </span>
+                      <select value={sc.field}
+                        onChange={e => setSortConfigs(prev => prev.map((s, i) => i === idx ? { ...s, field: e.target.value } : s))}
+                        style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid #D0D4E4', fontSize: 13, fontFamily: 'inherit', background: '#fff', color: '#323338', cursor: 'pointer' }}>
+                        <option value="">Choose column</option>
+                        {allCols.filter(c => !c.key.startsWith('_') && (String(c.key) === sc.field || !usedFields.includes(String(c.key)))).map(c => (
+                          <option key={String(c.key)} value={String(c.key)}>{c.label}</option>
+                        ))}
+                      </select>
+                      <select value={sc.dir}
+                        onChange={e => setSortConfigs(prev => prev.map((s, i) => i === idx ? { ...s, dir: e.target.value as 'asc' | 'desc' } : s))}
+                        style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #D0D4E4', fontSize: 13, fontFamily: 'inherit', background: '#fff', color: '#323338', cursor: 'pointer' }}>
+                        <option value="asc">↑ Ascending</option>
+                        <option value="desc">↓ Descending</option>
+                      </select>
+                      <button onClick={() => setSortConfigs(prev => prev.filter((_, i) => i !== idx))}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#C5C7D4', display: 'flex', alignItems: 'center', padding: 4, borderRadius: 4, flexShrink: 0 }}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#676879')}
+                        onMouseLeave={e => (e.currentTarget.style.color = '#C5C7D4')}>
+                        <X size={15} />
+                      </button>
+                    </div>
+                  );
+                })}
+                {/* + New sort */}
+                {sortConfigs.length < allCols.filter(c => !c.key.startsWith('_')).length && (
+                  <button
+                    onClick={() => setSortConfigs(prev => {
+                      const used = prev.map(s => s.field);
+                      const next = allCols.find(c => !c.key.startsWith('_') && !used.includes(String(c.key)));
+                      if (!next) return prev;
+                      return [...prev, { field: String(next.key), dir: 'asc' }];
+                    })}
+                    style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6, padding: '6px 4px', background: 'none', border: 'none', borderRadius: 6, fontSize: 13, color: '#676879', cursor: 'pointer', fontFamily: 'inherit' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#0073EA')}
+                    onMouseLeave={e => (e.currentTarget.style.color = '#676879')}>
+                    <Plus size={14} /> New sort
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          {/* Hide */}
+          <button style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', background: 'none', border: 'none', borderRadius: 6, fontSize: 13, color: '#676879', cursor: 'pointer', fontFamily: 'inherit' }}
+            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F5F6F8')}
+            onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
+            <Eye size={14} /> Hide
           </button>
-          <button style={{ display: 'flex', alignItems: 'center', padding: '7px 7px', backgroundColor: '#0073EA', color: '#fff', border: 'none', borderLeft: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer' }}>
-            <ChevronDown size={13} />
+          {/* Group by button + popup */}
+          <div data-groupby-popup style={{ position: 'relative' }}>
+            <button onClick={() => { setShowGroupBy(p => !p); setShowSort(false); setShowFilter(false); }}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', background: showGroupBy || !!groupByField ? '#E8F0FE' : 'none', border: 'none', borderRadius: 6, fontSize: 13,
+                color: showGroupBy || !!groupByField ? '#0073EA' : '#676879', cursor: 'pointer', fontFamily: 'inherit', fontWeight: groupByField ? 600 : 400 }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = showGroupBy || !!groupByField ? '#E8F0FE' : '#F5F6F8')}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = showGroupBy || !!groupByField ? '#E8F0FE' : 'transparent')}>
+              <MoreHorizontal size={14} /> Group by
+              {groupByField && <span style={{ background: '#0073EA', color: '#fff', borderRadius: 99, fontSize: 10, padding: '1px 5px', marginLeft: 2 }}>1</span>}
+            </button>
+            {showGroupBy && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 1000,
+                background: '#fff', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.14), 0 1px 4px rgba(0,0,0,0.08)',
+                border: '1px solid #E6E9EF', padding: '16px 20px', minWidth: 480, display: 'flex', flexDirection: 'column', gap: 14,
+              }}>
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#323338', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    Group items by
+                    <span style={{ width: 16, height: 16, borderRadius: '50%', border: '1.5px solid #676879', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#676879', cursor: 'default' }}>?</span>
+                  </span>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {groupByField && (
+                      <button onClick={() => { setGroupByField(null); setGroupByDir('asc'); }}
+                        style={{ fontSize: 12, color: '#676879', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '4px 8px', borderRadius: 6 }}
+                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F5F6F8')}
+                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
+                        Clear
+                      </button>
+                    )}
+                    <button style={{ fontSize: 12, color: '#676879', background: '#fff', border: '1px solid #D0D4E4', cursor: 'pointer', fontFamily: 'inherit', padding: '4px 12px', borderRadius: 6, fontWeight: 500 }}>
+                      Save as new view
+                    </button>
+                  </div>
+                </div>
+                {/* Column + direction row */}
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <select value={groupByField ?? ''}
+                    onChange={e => setGroupByField(e.target.value || null)}
+                    style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid #D0D4E4', fontSize: 13, fontFamily: 'inherit', background: '#fff', color: '#323338', cursor: 'pointer' }}>
+                    <option value="">Choose column</option>
+                    {allCols.filter(c => !c.key.startsWith('_') && !['name','notes','location','email','phone','landOwnerContact'].includes(String(c.key))).map(c => (
+                      <option key={String(c.key)} value={String(c.key)}>{c.label}</option>
+                    ))}
+                  </select>
+                  <select value={groupByDir}
+                    onChange={e => setGroupByDir(e.target.value as 'asc' | 'desc')}
+                    disabled={!groupByField}
+                    style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #D0D4E4', fontSize: 13, fontFamily: 'inherit', background: '#fff', color: '#323338', cursor: groupByField ? 'pointer' : 'default', opacity: groupByField ? 1 : 0.5 }}>
+                    <option value="asc">↑ A → Z</option>
+                    <option value="desc">↓ Z → A</option>
+                  </select>
+                </div>
+                {/* Show empty groups */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, color: '#323338' }}>
+                  <input type="checkbox" checked={showEmptyGroups} onChange={e => setShowEmptyGroups(e.target.checked)}
+                    style={{ width: 16, height: 16, accentColor: '#0073EA', cursor: 'pointer', flexShrink: 0 }} />
+                  Show empty groups
+                </label>
+                {/* Divider + Give feedback */}
+                <div style={{ borderTop: '1px solid #E6E9EF', paddingTop: 10, display: 'flex', alignItems: 'center', gap: 6, color: '#676879', fontSize: 12, cursor: 'pointer' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#0073EA')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#676879')}>
+                  <Smile size={14} /> Give feedback
+                </div>
+              </div>
+            )}
+          </div>
+          <button onClick={() => setShowAddCol(true)}
+            style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', background: 'none', border: '1px dashed #D0D4E4', borderRadius: 6, fontSize: 13, color: '#676879', cursor: 'pointer', fontFamily: 'inherit' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#0073EA'; (e.currentTarget as HTMLButtonElement).style.color = '#0073EA'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#D0D4E4'; (e.currentTarget as HTMLButtonElement).style.color = '#676879'; }}>
+            <Plus size={13} /> Add column
           </button>
         </div>
-        {[
-          { label: 'Search', icon: Search }, { label: 'Person', icon: Users },
-          { label: 'Filter', icon: Filter }, { label: 'Sort',   icon: ArrowUpDown },
-          { label: 'Hide',   icon: Eye },   { label: 'Group by', icon: MoreHorizontal },
-        ].map(({ label, icon: Icon }) => (
-          <button key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', background: 'none', border: 'none', borderRadius: 6, fontSize: 13, color: '#676879', cursor: 'pointer', fontFamily: 'inherit' }}
-            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F5F6F8')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
-            <Icon size={14} /> {label}
-          </button>
-        ))}
-        <button onClick={() => setShowAddCol(true)}
-          style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', background: 'none', border: '1px dashed #D0D4E4', borderRadius: 6, fontSize: 13, color: '#676879', cursor: 'pointer', fontFamily: 'inherit' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#0073EA'; (e.currentTarget as HTMLButtonElement).style.color = '#0073EA'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#D0D4E4'; (e.currentTarget as HTMLButtonElement).style.color = '#676879'; }}>
-          <Plus size={13} /> Add column
-        </button>
-      </div>
+
+      </div>}
 
       {/* Main content */}
       {groups.length === 0 ? (
         <EmptyBoard onAddGroup={() => setShowNewGroup(true)} />
+      ) : activeTab === 1 ? (
+        /* ── Map view ── */
+        <MapView groups={groups} />
       ) : (
         <>
           {/* Shared horizontal scroll container */}
           <div ref={contentRef} onScroll={onContentScroll} className="board-content"
             style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', padding: '14px 24px 8px' }}>
             <div style={{ minWidth: totalColWidth }}>
-              {groups.map(group => (
-                <GroupBlock key={group.id} group={group} boardId={id}
-                  onUpdate={handleUpdateGroup} onDelete={handleDeleteGroup}
-                  cols={allCols} onError={setError}
-                  onOpenUpdates={(item, groupId) => setUpdatesPanel({ item, groupId })} />
-              ))}
-              <button onClick={() => setShowNewGroup(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', background: 'none', border: '1px dashed #D0D4E4', borderRadius: 6, cursor: 'pointer', color: '#676879', fontSize: 13, fontFamily: 'inherit', marginTop: 4, marginBottom: 16 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#0073EA'; (e.currentTarget as HTMLButtonElement).style.color = '#0073EA'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#D0D4E4'; (e.currentTarget as HTMLButtonElement).style.color = '#676879'; }}>
-                <Plus size={14} /> Add new group
-              </button>
+              {groupByField ? (
+                // ── Dynamic grouping ─────────────────────────────────────────
+                (() => {
+                  const allItems = applyFilters(groups.flatMap(g => g.items), filterConfigs);
+                  const groupMap = new Map<string, BoardItem[]>();
+                  allItems.forEach(item => {
+                    const val = (item as unknown as Record<string, unknown>)[groupByField];
+                    const key = val != null && String(val).trim() ? String(val).trim() : '(Empty)';
+                    if (!groupMap.has(key)) groupMap.set(key, []);
+                    groupMap.get(key)!.push(item);
+                  });
+                  const COLORS = ['#0085FF','#00C875','#FDAB3D','#E2445C','#A25DDC','#FF7575','#037F4C','#FF642E'];
+                  let entries = Array.from(groupMap.entries());
+                  entries.sort(([a], [b]) => {
+                    if (a === '(Empty)') return 1;
+                    if (b === '(Empty)') return -1;
+                    return groupByDir === 'asc' ? a.localeCompare(b) : b.localeCompare(a);
+                  });
+                  if (!showEmptyGroups) entries = entries.filter(([, items]) => items.length > 0);
+                  return entries.map(([val, items], idx) => {
+                    const fakeGroup: BoardGroup = {
+                      ...groups[0], id: `gb_${val}`, name: val,
+                      color: COLORS[idx % COLORS.length], items,
+                    };
+                    return (
+                      <GroupBlock key={`gb_${val}`} group={fakeGroup} boardId={id}
+                        onUpdate={() => {}} onDelete={() => {}}
+                        cols={allCols} onError={setError} readOnly
+                        sortConfigs={sortConfigs}
+                        onRenameCol={handleRenameCol} onDeleteCol={handleDeleteCol} onDuplicateCol={handleDuplicateCol} onAddColRight={handleAddColRight}
+                        onOpenUpdates={(item, groupId) => setUpdatesPanel({ item, groupId })} />
+                    );
+                  });
+                })()
+              ) : (
+                // ── Normal groups from DB ────────────────────────────────────
+                groups.map(group => (
+                  <GroupBlock key={group.id} group={group} boardId={id}
+                    onUpdate={handleUpdateGroup} onDelete={handleDeleteGroup}
+                    cols={allCols} onError={setError}
+                    sortConfigs={sortConfigs} filterConfigs={filterConfigs}
+                    onRenameCol={handleRenameCol} onDeleteCol={handleDeleteCol} onDuplicateCol={handleDuplicateCol}
+                    onOpenUpdates={(item, groupId) => setUpdatesPanel({ item, groupId })} />
+                ))
+              )}
+              {!groupByField && (
+                <button onClick={() => setShowNewGroup(true)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', background: 'none', border: '1px dashed #D0D4E4', borderRadius: 6, cursor: 'pointer', color: '#676879', fontSize: 13, fontFamily: 'inherit', marginTop: 4, marginBottom: 16 }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#0073EA'; (e.currentTarget as HTMLButtonElement).style.color = '#0073EA'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#D0D4E4'; (e.currentTarget as HTMLButtonElement).style.color = '#676879'; }}>
+                  <Plus size={14} /> Add new group
+                </button>
+              )}
             </div>
           </div>
 

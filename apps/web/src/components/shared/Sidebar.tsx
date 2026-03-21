@@ -8,7 +8,7 @@ import {
   Home, CheckSquare, MoreHorizontal, Sparkles, ChevronRight,
   LayoutGrid, FileText, BarChart2, Wand2, Heart, FileEdit,
   GitBranch, PenLine, Folder, AppWindow, Download, Star,
-  Search, Plus, Table2, Layers, Copy,
+  Search, Plus, Table2, Layers, Copy, Users,
 } from 'lucide-react';
 import ZeonLogo from '@/components/ui/ZeonLogo';
 import type { BoardType } from '@/services/boards';
@@ -253,6 +253,7 @@ function TemplatePicker({ onClose, onCreate }: {
 const NAV_ITEMS = [
   { label: 'Home',    icon: Home,           href: '/dashboard' },
   { label: 'My work', icon: CheckSquare,    href: '/dashboard/my-work' },
+  { label: 'Users',   icon: Users,          href: '/dashboard/users' },
   { label: 'More',    icon: MoreHorizontal, href: '/dashboard/more' },
 ];
 
